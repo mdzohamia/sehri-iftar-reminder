@@ -1,0 +1,68 @@
+name: Auto Build & Release APK
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build_and_release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Signed Release APK
+        run: flutter build apk --release
+
+      - name: Read Version from pubspec.yaml
+        id: version
+        run: |
+          FULL_VER=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          VER_NAME=$(echo $FULL_VER | cut -d'+' -f1)
+          VER_CODE=$(echo $FULL_VER | cut -d'+' -f2)
+          echo "name=$VER_NAME" >> $GITHUB_OUTPUT
+          echo "code=$VER_CODE" >> $GITHUB_OUTPUT
+
+      - name: Update version.json automatically
+        run: |
+          cat <<EOF > version.json
+          {
+            "latest_version": ${{ steps.version.outputs.code }},
+            "version_name": "${{ steps.version.outputs.name }}",
+                        "apk_url": "https://github.com/mdzohamia/sehri-iftar-reminder/releases/download/v${{ steps.version.outputs.name }}/app-release.apk",
+
+            "release_notes": "নতুন ভার্সন v${{ steps.version.outputs.name }} আপডেট করা হয়েছে।"
+          }
+          EOF
+          
+          
+                  git config --global user.email "bot@example.com"
+
+          git add version.json
+          git commit -m "Auto update version.json to v${{ steps.version.outputs.name }} [skip ci]" || exit 0
+          git push
+
+      - name: Publish Release to GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.name }}
+          name: Sehri & Iftar Reminder v${{ steps.version.outputs.name }}
+          files: build/app/outputs/flutter-apk/app-release.apk
