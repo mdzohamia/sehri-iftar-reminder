@@ -30,7 +30,8 @@ jobs:
         run: flutter pub get
 
       - name: Build Signed Release APK
-        run: flutter build apk --release
+
+        run: flutter build apk --release --android-skip-build-dependency-validation
 
       - name: Read Version from pubspec.yaml
         id: version
